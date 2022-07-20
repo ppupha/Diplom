@@ -1,0 +1,27 @@
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Intellij
+.idea/
+*.iml
+*.iws
+*.class
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+pipe-gui/dependency-reduced-pom.xml
+
+#ANTLR
+pipe-core/gen
+
+#PIPE
+PipeTestFile.xml
+
+#Pages
+_site

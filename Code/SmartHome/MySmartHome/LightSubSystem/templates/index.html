@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+    <h2>Toggle Switch</h2>
+    {% for l in lights %}
+        <h2>Hello</h2>
+        <h2>{{ l.name }}</h2>
+        <label class="switch">
+          {% if l.isOn %}
+          <input type="checkbox" checked onchange="handleChange(event)" name = "{{ l.name }}">
+          {% else %}
+          <span class="slider round"></span>
+          {% endif %}
+        </label>
+    {% endfor %}
+
+
+<script type="text/javascript">
+function handleChange(e) {
+     const checked = e.target;
+     alert(checked.name);
+}
+
+</script>
+
+{% endblock %}
+
+

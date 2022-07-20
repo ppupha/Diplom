@@ -1,0 +1,446 @@
+define = {}
+NONE = 'Default'
+TRUE = 'True'
+FALSE = 'False'
+
+
+TransLabels = {}
+
+
+class SimpleToken:
+    def __init__(self, type = NONE, value = None):
+        self.type = type
+        self.value = value
+        
+    def showStatus(self,):
+        print("This is Default")
+
+class Place:
+    def __init__(self, tokens = [],  name = ''):
+        self.name = name
+        self.tokens = tokens
+        self.holds = self.typeCount()
+        self.hold = sum(self.holds.values())
+        
+    def countTokens(self,):
+        return self.hold
+    
+    def typeCount(self,):
+        res = {NONE: 0,
+                }
+        
+        for i in self.tokens:
+            if str(i.type) in res:
+                res[str(i.type)] += 1
+            else:
+                print("*"*10, str(i.type))
+                res[str(i.type)] = 1
+        return res
+            
+    def update(self,):
+        self.holds = self.typeCount()
+        self.hold = sum(self.holds.values())
+    
+    def pop(self, type = 0, count = 1):
+        c = count
+        tokens = []
+        
+        for index, value in enumerate(self.tokens):
+            if c > 0 and value.type == type:
+                tokens.append(self.tokens[index - count + c])
+                self.tokens.pop(index - count + c)
+                c -= 1    
+        self.update()
+        return tokens
+        
+    def append(self, list = []):
+        for i in list:
+            self.tokens.append(i)
+            # TODO
+        self.update()
+        return 
+                       
+class ArcBase:
+    def __init__(self, place, hold = 1, label = None, allowType = NONE, name = ''):
+        self.place = place
+        self.hold = hold
+        if (label == None):
+            self.label = NONE
+        else:
+            self.label = label
+        self.allowType = allowType
+        self.name = name
+    
+    def isNotBlocking(self,):
+        rc = str(self.allowType) in self.place.holds and self.place.holds[str(self.allowType)] >= self.hold
+        print(self.name, rc, self.place.holds)
+        return rc
+
+class ArcIn(ArcBase):
+    def trigger(self, ):
+        tokens = []
+        self.place.holds[str(self.allowType)] -= self.hold
+        tokens = self.place.pop(self.allowType, self.hold)
+        return tokens
+        
+class ArcOut(ArcBase):
+    def trigger(self, tokens ):
+        append_tokens = []
+        c = 0
+        for i in tokens:
+            if (c < self.hold):
+                if i.type == self.allowType:
+                    append_tokens.append(i)
+                    c += 1
+        print(self.place.holds)
+        self.place.holds[str(self.allowType)] += self.hold
+        self.place.append(append_tokens)
+        return 
+        
+class ArcEmpty(ArcBase):
+    def isNotBlocking(self,):
+        return self.hold == 0
+
+    def trigger(self,):
+        pass
+        
+class Transition:
+    def __init__(self, arcIn, arcOut, name = '', isAuto = False, label = None, priority = 100,):
+        self.name = name
+        self.arcIn = arcIn
+        self.arcOut = arcOut
+        self.priority = priority
+        self.isAuto = isAuto
+        self.label = label
+        self.addtoTransLabel()
+            
+        
+        for i in arcIn:
+            i.name = "[{} -> {}]".format(i.place.name, name)
+            
+        for i in arcOut:
+            i.name = "[{} -> {}]".format(name, i.place.name)
+      
+    def addtoTransLabel(self,):
+        global TransLabels
+        if self.getLabel() not in TransLabels:
+            TransLabels[self.getLabel()] = {'main':[], '*': []}
+        if self.label.startswith('*'):
+            TransLabels[self.getLabel()]['*'].append(self)
+        else:
+            TransLabels[self.getLabel()]['main'].append(self)
+            
+    def removeFromTransLabel(self,):
+        trans = TransLabels[self.getLabel()]
+        if self in trans['main']:
+            trans['main'].remove(self)
+        if self in trans['*']:
+            trans['*'].remove(self)
+      
+    def getLabel(self):
+        if self.label.startswith("*"):
+            return self.label
+        if self.label.startswith('not'):
+            return self.label[3:]
+        return self.label
+    def setLabel(self, newLabel):
+        self.removeFromTransLabel()
+        self.label = newLabel
+        self.addtoTransLabel()
+        
+        self.label = newLabel
+      
+    def needFireWith(self, T):
+        return self.label == "not" + T.label or "not" + self.label == T.label
+        
+    def needFireIf(self, T):
+        return self.label == "*" + T.label
+        
+    def isActive(self, ):
+        for i in self.arcIn:
+            if not i.isNotBlocking():
+                return False
+             
+        return True
+    
+    def getInPlaces(self):
+        res = []
+        for i in self.arcIn:
+            res.append(i.place)
+        return set(res)
+    
+    def isConflictWith(self, T):
+        # TODO
+        return False
+        #print(self.isActive, T.isActive)
+        '''
+        if not self.isActive() or not T.isActive():
+            return False
+        for i in self.arcIn:
+            p = i.place
+            for j in T.arcIn:
+                pT = j.place
+                if p == pT and i.hold + j.hold > p.hold:
+                    return True
+        '''
+        return False
+                    
+        
+    def fire(self, ):
+        # TODO
+        print(" {} ia Activated\n".format(self.name))
+        isActive = 1#self.isActive()
+        popTokens = {}
+        if (isActive):
+            for i in self.arcIn:
+                tokens = i.trigger()
+                if (i.label not in popTokens):
+                    popTokens[i.label] = []
+                popTokens[i.label].extend(tokens)
+            for i in self.arcOut:
+                if i.label in popTokens:
+                    i.trigger(popTokens[i.label])
+                
+        return isActive
+    
+    
+class PetriNet:
+    def __init__(self, transitions = [], name = '', type = None):
+        self.name = name
+        self.transitions = transitions
+        self.relNet = []
+        if type == None:
+            self.type = self.name
+        else:
+            self.type = type
+        '''
+        {label : [[main,], [if]]}
+        '''
+        self.relLabel = {}
+    
+
+    def createTrans(self, arcIn, arcOut, name = '', isAuto = False, label = None, priority = 100,):
+        t = Transition(arcIn, arcOut, name, isAuto, label, priority)
+        self.transitions.append(t)
+
+    def addWithLabel(self,Tmain, TWith):
+        label = Tmain.getLabel()
+        if label not in self.relLabel:
+            self.relLabel[label] = [[Tmain], []]
+        
+        self.relLabel[label][0].append(TWith)
+        
+    def addIfLabel(self, Tmain, Tif):
+        label = Tmain.getLabel()
+        if label not in self.relLabel:
+            self.relLabel[label] = [[Tmain], []]
+        
+        self.relLabel[label][1].append(TIf)
+        
+    def addRelTrans(self, pn):
+        for t in self.transitions:
+            for tpn in pn.transitions:
+                if tpn.needFireWith(t):
+                    self.addWithLabel(t, tpn)
+                if tpn.needFireIf(t):
+                    self.addIfLabel(t, tpn)
+    
+    def addRelateNet(self, pn):
+        self.relNet.append(pn)
+        self.addRelTrans(pn)
+        return
+        
+    def getAllPlaces(self, ):
+        place = []
+        for i in self.transitions:
+            for j in i.arcIn + i.arcOut:
+                place.append(j.place)
+        
+        place = list(set(place))
+        place.sort(key = lambda x: x.name)
+        return place
+        
+    def showStatus(self, placeList = None):
+        if placeList == None:
+            placeList = self.getAllPlaces()
+        print("\n\n")
+        print(self.name)
+        for i in placeList:
+            print("{:^10}".format(i.name), end = '')
+        print("\n")
+        for i in placeList:
+            print("{:^10}".format(i.hold), end = '')
+        print("\n\n")
+        
+        #for i in self.relNet:
+        #    i.showStatus()
+        
+    def getTransitionByName(self, name):
+        for i in self.transitions:
+            if i.name == name:
+                return i
+        return None
+    def getPlaceByName(self, name):
+        places = self.getAllPlaces()
+        for i in places:
+            if i.name == name:
+                return i
+    
+    def isConflictWithAny(self, T):
+        res = []
+        for t in self.transitions:
+            if t != T and T.isConflictWith(t):
+                continue
+       
+    def run(self, sequence = None):
+        count = 0
+        global TransLabels
+        if (sequence == None):
+            return count
+        
+        for i in sequence:
+            relatedTrans = TransLabels[i.getLabel()]['main']
+            isActives = [t.isActive() for t in relatedTrans]
+            print(isActives)
+            if (False in isActives):
+                print("{} cant be fired".format(i.name))
+                continue
+            
+            for t in relatedTrans:
+                t.fire()
+            count += 1
+            print("\n\nAfter Active {}".format(i.name))
+            #self.showStatus(self.getAllPlaces())
+        return count
+    
+    def autorun(self):
+        print("Status at Begin\n")
+        self.showStatus()
+        while True:
+            print("#"*20)
+            count_Active = 0
+            
+            for i in self.transitions:
+                if i.isAuto:
+                    rc = self.run([i,])
+                    if (rc == 1):
+                        count_Active += 1
+                        
+                        self.showStatus()
+                        break
+            if count_Active == 0:
+                return 
+        
+    
+     
+ 
+ 
+ 
+class Light:
+    def __init__(self,PN):
+        self.PN = PN
+        self.name = self.PN.name
+
+    def turn_on():
+        pass
+ 
+
+class SH:
+    def __init__(self,):
+        self.PN = []
+    
+    def getPNByName(self, name):
+        for i in self.PN:
+            if i.name == name:
+                return i
+                
+    def addNet(self, pn):
+        self.PN.append(pn)
+        
+        
+    def addRelated(self, PN1, PN2):
+        PN1.addRelateNet(PN2)
+        PN2.addRelateNet(PN1)
+    
+    
+    def getNewLight(self,):
+        P4 = Place(tokens = [SimpleToken() for _ in range(1)], name = "P4")
+        P5 = Place(tokens = [], name = "P5")
+
+        T3 = Transition(name = "T3", arcIn = [ArcIn(place = P4, ), ], 
+                             arcOut = [ArcOut(place = P5),], label = "notl1")
+
+        T4 = Transition(name = "T4", arcIn = [ArcIn(place = P5, ), ], 
+                             arcOut = [ArcOut(place = P4),], label = "notl2")   
+
+        PN2 = PetriNet([T3, T4], name = "PN2", type = NONE)
+        return PN2
+                
+                
+        
+    
+'''       
+       
+noneType = NONE
+sh = SH()
+
+
+P1 = Place(tokens = [SimpleToken()], name = "P1")
+P2 = Place(tokens = [], name = "P2")
+P3 = Place(tokens = [SimpleToken()], name = "P3")
+P4 = Place(tokens = [], name = "P4")
+
+
+T1 = Transition(name = "T1", arcIn = [ArcIn(place = P1, ), ], 
+                             arcOut = [ArcOut(place = P2),], label = "l1")
+                             
+T2 = Transition(name = "T2", arcIn = [ArcIn(place = P2, ), ], 
+                             arcOut = [ArcOut(place = P1),], label = "l2")
+
+T3 = Transition(name = "T3", arcIn = [ArcIn(place = P3, ), ], 
+                             arcOut = [ArcOut(place = P4),], label = "notl1")
+
+T4 = Transition(name = "T4", arcIn = [ArcIn(place = P4, ), ], 
+                             arcOut = [ArcOut(place = P3),], label = "notl2")                             
+
+PN1 = PetriNet([T1, T2], name = "PN1")
+PN2 = PetriNet([T3, T4], name = "PN2")
+
+'''
+class SimpleLight:
+    def __init__(self, name):
+        self.name = name
+        self.onPlace = Place(tokens = [], name = self.name + 'on')
+        self.offPlace = Place(tokens = [SimpleToken()], name = self.name + 'off')
+        self.onLightTrans = Transition(name = "turn_on" + self.name, arcIn = [ArcIn(place = self.offPlace, ), ], 
+                             arcOut = [ArcOut(place = self.onPlace),], label = "")
+        self.offLightTrans = Transition(name = "turn_on" + self.name, arcIn = [ArcIn(place = self.onPlace, ), ], 
+                             arcOut = [ArcOut(place = self.offPlace),], label = "")
+        self.PN = PetriNet([self.onLightTrans, self.offLightTrans], name = self.name)
+        
+    def getNet(self,):
+        return self.PN
+        
+    def turnOn(self,):
+        self.PN.run([self.onLightTrans])
+        
+    def turnOff(self,):
+        self.PN.run([self.offLightTrans])
+    
+    
+    def isOn(self,):
+        return self.onPlace.countTokens() > 0
+        
+    def isOff(self,):
+        return self.offPlace.countTokens() > 0
+        
+        
+
+
+    
+
+
+    
+
+
+

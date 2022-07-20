@@ -1,0 +1,103 @@
+import sys
+from os import environ
+from PyQt5 import uic
+from PyQt5.QtCore import pyqtSlot, Qt, QTime, QTimer
+from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QTableWidgetItem, QDialog
+from numpy import random as nr
+from itertools import *
+
+from PetriNet import *
+
+
+
+def suppress_qt_warnings():
+    environ["QT_DEVICE_PIXEL_RATIO"] = "0"
+    environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+    environ["QT_SCREEN_SCALE_FACTORS"] = "1"
+    environ["QT_SCALE_FACTOR"] = "1"
+    
+ 
+
+ 
+class MainWindow(QWidget):
+    def __init__(self, parent=None):
+        super(MainWindow, self).__init__(parent)
+        self.ui = uic.loadUi("sh.ui", self)
+        self.btn_light1.clicked.connect(self.btn_light1Clicked)
+        self.btn_light1.setCheckable(True)
+        self.btn_light1.setStyleSheet("background-color : lightgrey")
+        
+        self.btn_light2.clicked.connect(self.light2Clicked)
+        self.btn_light2.setCheckable(True)
+        self.btn_light2.setStyleSheet("background-color : lightgrey")
+        self.light1 = SimpleLight('Light1')
+        self.light2 = SimpleLight('Light2')
+        
+        self.light1.onLightTrans.setLabel('l1')
+        self.light1.offLightTrans.setLabel('l2')
+        
+        self.light2.onLightTrans.setLabel('notl1')
+        self.light2.offLightTrans.setLabel('notl2')
+        self.neeđUpateLight = False
+        print("^"*100)
+        print(TransLabels)
+        
+        self.calcTimer()
+        
+    def calcTimer(self,):
+        self.timer = QTimer()
+        self.deltaT = 50
+        self.timer.timeout.connect(self.auto_update)
+        self.timer.start(self.deltaT)
+        
+    def btn_light1Clicked(self,):
+        print("*" * 50)
+        self.neeđUpateLight = True
+        if self.btn_light1.isChecked():
+            self.light1.turnOn()
+        else:
+            self.light1.turnOff()
+            
+    def light2Clicked(self,):
+        print("#" * 50)
+        self.neeđUpateLight = True
+        if self.btn_light2.isChecked():
+            self.light2.turnOn()
+        else:
+            self.light2.turnOff()
+        
+    def auto_update(self,):
+        if (self.neeđUpateLight):
+            print("Updating")
+        
+            self.update_light()
+            
+    def update_light(self):
+        print()
+        self.light1.PN.showStatus()
+        self.light2.PN.showStatus()
+        if self.light1.isOn():
+            self.btn_light1.setStyleSheet("background-color : lightblue")
+        else:
+            self.btn_light1.setStyleSheet("background-color : lightgrey")
+            
+        if self.light2.isOn():
+            self.btn_light2.setStyleSheet("background-color : lightblue")
+        else:
+            self.btn_light2.setStyleSheet("background-color : lightgrey")
+        
+        self.neeđUpateLight = False
+        
+            
+        
+        
+        
+        
+
+def qt_app():
+    suppress_qt_warnings()
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    return app.exec()
+    
